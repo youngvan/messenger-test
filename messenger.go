@@ -5,6 +5,8 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
+
+	pb "github.com/youngvan/messenger-test/messenger/messengerpb"
 )
 
 func main() {
@@ -14,7 +16,7 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	messengerServer := Messenger.Server{}
+	messengerServer := pb.Messenger.Server{}
 
 	grpcServer := grpc.NewServer()
 
