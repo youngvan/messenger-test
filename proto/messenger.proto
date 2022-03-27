@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package messengerpb;
+package messenger;
 
-option go_package = "github.com/youngvan/messenger-test/messenger/messengerpb";;
+option go_package = "messenger/proto";
 
 service Messenger {
   rpc Exchange (IncomingMessages) returns (OutgoingMessages) {}
@@ -24,9 +24,15 @@ message IncomingMessages {
 }
 
 message OutgoingMessages {
-    enum status {
+   
+    enum statusType {
         SUCCESS = 0;
         AUTHFAIL = -1;
     }
-    repeated Message messages = 2;
+
+    statusType status = 1;
+    string helloMsg = 2;
+
+
+    repeated Message messages = 3;
 }
