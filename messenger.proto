@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package messengerpb;
 
-option go_package = "github.com/youngvan/messenger-test";
+option go_package = "github.com/youngvan/messenger-test/messengerpb";
 
 service Messenger {
   rpc Exchange (IncomingMessages) returns (OutgoingMessages) {}
