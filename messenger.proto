@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package messenger;
+package messengerpb;
 
 option go_package = "github.com/youngvan/messenger-test";
 
