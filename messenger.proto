@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package messenger;
+
+option go_package = "./";
+
+service Messenger {
+  rpc Exchange (IncomingMessages) returns (OutgoingMessages) {}
+}
+
+message Message {
+  string authorName = 1;
+  string authorHash = 2;
+  string receiverHame = 3;
+  string receiverHash = 4;
+  string subject = 5;
+  int32 createdAt = 6;
+  string body = 7;
+}
+
+message IncomingMessages {
+    string authHash = 1;
+    repeated Message messages = 2;
+}
+
+message OutgoingMessages {
+    enum status {
+        SUCCESS = 0;
+        AUTHFAIL = -1;
+    }
+    repeated Message messages = 2;
+}
