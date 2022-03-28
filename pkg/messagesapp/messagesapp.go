@@ -8,7 +8,7 @@ import (
 	"github.com/randallmlough/pgxscan"
 	"go.uber.org/zap"
 
-	pb "messenger/proto"
+	pb "messenger/gen/proto/go/messagesproto/v1"
 )
 
 type UserStruct struct {

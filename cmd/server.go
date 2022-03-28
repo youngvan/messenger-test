@@ -12,23 +12,23 @@ import (
 
 	msgapp "messenger/pkg/messagesapp"
 
-	pb "messenger/proto"
+	pb "messenger/gen/proto/go/messagesproto/v1"
 )
 
 type MessengerServer struct {
-	pb.UnimplementedMessengerServer
+	pb.UnimplementedMessengerServiceServer
 	logger *zap.SugaredLogger
 	db     *pgxpool.Pool
 }
 
-func (s *MessengerServer) Exchange(ctx context.Context, in *pb.IncomingMessages) (*pb.OutgoingMessages, error) {
+func (s *MessengerServer) Exchange(ctx context.Context, in *pb.ExchangeRequest) (*pb.ExchangeResponse, error) {
 	s.logger.Info("Incoming request", zap.Any("request", in))
 
 	// Validate AuthHash present
 	if in.AuthHash == "" {
-		return &pb.OutgoingMessages{
-			Status:   pb.OutgoingMessages_AUTHFAIL,
-			HelloMsg: "authHash missed"}, nil
+		return &pb.ExchangeResponse{
+			Status:        pb.ExchangeResponse_STATUS_TYPE_AUTHFAIL,
+			StatusMessage: "authHash missed"}, nil
 	}
 
 	// Create app
@@ -37,12 +37,12 @@ func (s *MessengerServer) Exchange(ctx context.Context, in *pb.IncomingMessages)
 	// Auth User
 	// @todo implement native auth
 	if err := app.Login(in.AuthHash); err != nil {
-		return &pb.OutgoingMessages{
-			Status:   pb.OutgoingMessages_AUTHFAIL,
-			HelloMsg: "AUTH failed"}, nil
+		return &pb.ExchangeResponse{
+			Status:        pb.ExchangeResponse_STATUS_TYPE_AUTHFAIL,
+			StatusMessage: "AUTH failed"}, nil
 	}
 
-	responce := &pb.OutgoingMessages{}
+	responce := &pb.ExchangeResponse{}
 
 	// Save icoming messages to DB
 	// @todo - how to handle error?
@@ -92,7 +92,7 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 
-	pb.RegisterMessengerServer(grpcServer, &messengerServer)
+	pb.RegisterMessengerServiceServer(grpcServer, &messengerServer)
 
 	if err := grpcServer.Serve(lis); err != nil {
 		sugarZap.Error("failed to serve: %s", err)

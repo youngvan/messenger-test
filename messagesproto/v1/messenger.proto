@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package messagesproto.v1;
+
+option go_package = "messenger/messengerproto";
+
+service MessengerService {
+  rpc Exchange (ExchangeRequest) returns (ExchangeResponse) {}
+}
+
+message Message {
+  string author_name = 1;
+  string author_hash = 2;
+  string receiver_name = 3;
+  string receiver_hash = 4;
+  string subject = 5;
+  int32 created_at = 6;
+  string body = 7;
+}
+
+message ExchangeRequest {
+    string auth_hash = 1;
+    repeated Message messages = 2;
+}
+
+message ExchangeResponse {
+   
+    enum StatusType {
+        STATUS_TYPE_UNSPECIFIED = 0;
+        STATUS_TYPE_SUCCESS = 1;
+        STATUS_TYPE_AUTHFAIL = -1;
+    }
+
+    StatusType status = 1;
+    string status_message = 2;
+
+
+    repeated Message messages = 3;
+}
