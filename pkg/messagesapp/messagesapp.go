@@ -3,8 +3,8 @@ package messagesapp
 import (
 	"context"
 
+	"github.com/georgysavva/scany/pgxscan"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/randallmlough/pgxscan"
 	"go.uber.org/zap"
 
 	"messenger/pkg/user"
@@ -39,11 +39,12 @@ func (app *MessagesApp) SaveMessages(ctx context.Context, user *user.UserStruct,
 }
 
 func (app *MessagesApp) GetMessages(ctx context.Context, user *user.UserStruct) ([]MessagesStruct, error) {
-	rows, _ := app.Db.Query(context.Background(), "select subject from messages where id_to = $1", user.LoggedUser.ID)
 
 	result := []MessagesStruct{}
 
-	if err := pgxscan.NewScanner(rows).Scan(&result); err != nil {
+	query := "select subject from messages where id_to = $1"
+
+	if err := pgxscan.Select(ctx, app.Db, &result, query, user.LoggedUser.ID); err != nil {
 		app.Logger.Info("Error with getting messages", err)
 		return nil, err
 	}

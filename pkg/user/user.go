@@ -3,8 +3,8 @@ package user
 import (
 	"context"
 
+	"github.com/georgysavva/scany/pgxscan"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/randallmlough/pgxscan"
 	"go.uber.org/zap"
 )
 
@@ -24,7 +24,7 @@ func (user *UserStruct) Login(ctx context.Context, token string) error {
 
 	rows, _ := user.Db.Query(ctx, "SELECT id, name, hash FROM users WHERE hash=$1 LIMIT 1", token)
 
-	if err := pgxscan.NewScanner(rows).Scan(&user.LoggedUser); err != nil {
+	if err := pgxscan.ScanOne(&user.LoggedUser, rows); err != nil {
 		user.Logger.Info("failed to fetch user: ", err)
 		return err
 	}
