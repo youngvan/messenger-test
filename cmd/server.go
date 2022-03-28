@@ -7,49 +7,16 @@ import (
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	"messenger/pkg/messagesapp"
 
-	pb "messenger/gen/proto/go/messagesproto/v1"
+	"messenger/internal/messengerserver"
+	"messenger/pkg/user"
+
+	pb "messenger/proto/gen/proto/go/messagesproto/v1"
 )
-
-type MessengerServer struct {
-	pb.UnimplementedMessengerServiceServer
-	App *messagesapp.MessagesApp
-}
-
-func (s *MessengerServer) Exchange(ctx context.Context, in *pb.ExchangeRequest) (*pb.ExchangeResponse, error) {
-
-	// Validate AuthHash present
-	if in.AuthHash == "" {
-		return nil, status.Errorf(codes.Unauthenticated, "authHash missed")
-	}
-
-	// Auth User
-	// @todo implement native auth
-	if err := s.App.Login(in.AuthHash); err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "Auth missed")
-	}
-
-	responce := &pb.ExchangeResponse{}
-
-	// Save icoming messages to DB
-	if err := s.App.SaveMessages(in.Messages); err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "Error with saving messages")
-	}
-
-	// Get new messages
-	// @todo implement receiving messages from point of time
-	if responce.Messages, err := s.App.GetMessages(); err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "Error with getting new")
-	}
-
-	return responce, nil
-}
 
 func main() {
 
@@ -76,8 +43,23 @@ func main() {
 		Db:     dbConn,
 	}
 
-	messengerServer := MessengerServer{
-		App: &app,
+	// question: who should crteate UserApp?
+	// question: server.go and pass to rpcServer? rpcServer? or here?
+
+	// question: chains of passing db?
+
+	// question - too many possible objects in main?
+
+	currentUser := user.UserStruct{
+		Db:     app.Db,
+		Logger: app.Logger,
+	}
+
+	// question: duplication of prefit and name?
+	// question: module folder, module file name (lowercase?), and module name corellation
+	messengerServer := messengerserver.MessengerServer{
+		App:         &app,
+		CurrentUser: &currentUser,
 	}
 
 	grpcServer := grpc.NewServer()

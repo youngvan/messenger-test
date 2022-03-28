@@ -2,57 +2,34 @@ package messagesapp
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/randallmlough/pgxscan"
 	"go.uber.org/zap"
 
-	pb "messenger/gen/proto/go/messagesproto/v1"
+	"messenger/pkg/user"
+	pb "messenger/proto/gen/proto/go/messagesproto/v1"
 )
 
-type UserStruct struct {
-	ID   uint32 `db:"id"`
-	Name string `db:"name"`
-	Hash string `db:"hash"`
+type MessagesStruct struct {
+	Subject string `json:"subject,omitempty"`
+	Body    string `json:"body,omitempty"`
 }
 
 type MessagesApp struct {
 	Logger *zap.SugaredLogger
 	Db     *pgxpool.Pool
-	user   UserStruct
 }
 
-func NewMessagesApp(logger *zap.SugaredLogger, db *pgxpool.Pool) *MessagesApp {
-	app := new(MessagesApp)
-	app.logger = logger
-	app.db = db
-	return app
-}
+func (app *MessagesApp) SaveMessages(ctx context.Context, user *user.UserStruct, messages []*pb.Message) error {
 
-func (app *MessagesApp) Login(token string) error {
-
-	rows, _ := app.db.Query(context.Background(), "SELECT id, name, hash FROM users WHERE hash=$1 LIMIT 1", token)
-
-	if err := pgxscan.NewScanner(rows).Scan(&app.user); err != nil {
-		app.logger.Info("failed to fetch user: ", err)
-		return err
-	}
-
-	app.logger.Info("User fetched", zap.Any("user", app.user))
-
-	return nil
-}
-
-func (app *MessagesApp) SaveMessages(messages []*pb.Message) error {
-
-	sqlStatement := fmt.Sprintf("INSERT INTO messages (id_from, id_to, subject, body) VALUES (%d, (SELECT id from users where hash=$1), $2, $3)", app.user.ID)
+	sqlStatement := "INSERT INTO messages (id_from, id_to, subject, body) VALUES ($1, (SELECT id from users where hash=$2), $3, $4)"
 
 	for _, message := range messages {
 
-		_, err := app.db.Exec(context.Background(), sqlStatement, message.ReceiverHash, message.Subject, message.Body)
+		_, err := app.Db.Exec(ctx, sqlStatement, user.LoggedUser.ID, message.ReceiverHash, message.Subject, message.Body)
 		if err != nil {
-			app.logger.Info("Can't save msg: ", err, message)
+			app.Logger.Info("Can't save msg: ", err, message)
 		}
 
 	}
@@ -61,14 +38,16 @@ func (app *MessagesApp) SaveMessages(messages []*pb.Message) error {
 	return nil
 }
 
-func (app *MessagesApp) GetMessages(messages *[]*pb.Message) error {
-	rows, _ := app.db.Query(context.Background(), "select subject from messages where id_to = $1", app.user.ID)
+func (app *MessagesApp) GetMessages(ctx context.Context, user *user.UserStruct) ([]MessagesStruct, error) {
+	rows, _ := app.Db.Query(context.Background(), "select subject from messages where id_to = $1", user.LoggedUser.ID)
 
-	if err := pgxscan.NewScanner(rows).Scan(&messages); err != nil {
-		app.logger.Info("Error with getting messages", err)
-		return err
+	result := []MessagesStruct{}
+
+	if err := pgxscan.NewScanner(rows).Scan(&result); err != nil {
+		app.Logger.Info("Error with getting messages", err)
+		return nil, err
 	}
 
-	return nil
+	return result, nil
 
 }
