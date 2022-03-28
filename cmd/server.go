@@ -10,55 +10,15 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 
-	msgapp "messenger/pkg/messagesapp"
+	"messenger/pkg/messagesapp"
 
-	pb "messenger/gen/proto/go/messagesproto/v1"
+	"messenger/internal/messengerserver"
+	"messenger/pkg/user"
+
+	pb "messenger/proto/gen/proto/go/messagesproto/v1"
 )
 
-type MessengerServer struct {
-	pb.UnimplementedMessengerServiceServer
-	logger *zap.SugaredLogger
-	db     *pgxpool.Pool
-}
-
-func (s *MessengerServer) Exchange(ctx context.Context, in *pb.ExchangeRequest) (*pb.ExchangeResponse, error) {
-	s.logger.Info("Incoming request", zap.Any("request", in))
-
-	// Validate AuthHash present
-	if in.AuthHash == "" {
-		return &pb.ExchangeResponse{
-			Status:        pb.ExchangeResponse_STATUS_TYPE_AUTHFAIL,
-			StatusMessage: "authHash missed"}, nil
-	}
-
-	// Create app
-	app := msgapp.NewMessagesApp(s.logger, s.db)
-
-	// Auth User
-	// @todo implement native auth
-	if err := app.Login(in.AuthHash); err != nil {
-		return &pb.ExchangeResponse{
-			Status:        pb.ExchangeResponse_STATUS_TYPE_AUTHFAIL,
-			StatusMessage: "AUTH failed"}, nil
-	}
-
-	responce := &pb.ExchangeResponse{}
-
-	// Save icoming messages to DB
-	// @todo - how to handle error?
-	app.SaveMessages(in.Messages)
-
-	// Get new messages
-	// @todo implement receiving messages from point of time
-	// @todo - how to handle error?
-	app.GetMessages(&responce.Messages)
-
-	return responce, nil
-}
-
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	lis, err := net.Listen("tcp", ":9000")
 	if err != nil {
@@ -77,9 +37,29 @@ func main() {
 		log.Fatalf("failed start db: %v", err)
 	}
 
-	messengerServer := MessengerServer{
-		logger: sugarZap,
-		db:     dbConn,
+	// Create app
+	app := messagesapp.MessagesApp{
+		Logger: sugarZap,
+		Db:     dbConn,
+	}
+
+	// question: who should crteate UserApp?
+	// question: server.go and pass to rpcServer? rpcServer? or here?
+
+	// question: chains of passing db?
+
+	// question - too many possible objects in main?
+
+	currentUser := user.UserStruct{
+		Db:     app.Db,
+		Logger: app.Logger,
+	}
+
+	// question: duplication of prefit and name?
+	// question: module folder, module file name (lowercase?), and module name corellation
+	messengerServer := messengerserver.MessengerServer{
+		App:         &app,
+		CurrentUser: &currentUser,
 	}
 
 	grpcServer := grpc.NewServer()
