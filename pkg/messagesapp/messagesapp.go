@@ -18,8 +18,8 @@ type UserStruct struct {
 }
 
 type MessagesApp struct {
-	logger *zap.SugaredLogger
-	db     *pgxpool.Pool
+	Logger *zap.SugaredLogger
+	Db     *pgxpool.Pool
 	user   UserStruct
 }
 

@@ -7,58 +7,51 @@ import (
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 
-	msgapp "messenger/pkg/messagesapp"
+	"messenger/pkg/messagesapp"
 
 	pb "messenger/gen/proto/go/messagesproto/v1"
 )
 
 type MessengerServer struct {
 	pb.UnimplementedMessengerServiceServer
-	logger *zap.SugaredLogger
-	db     *pgxpool.Pool
+	App *messagesapp.MessagesApp
 }
 
 func (s *MessengerServer) Exchange(ctx context.Context, in *pb.ExchangeRequest) (*pb.ExchangeResponse, error) {
-	s.logger.Info("Incoming request", zap.Any("request", in))
 
 	// Validate AuthHash present
 	if in.AuthHash == "" {
-		return &pb.ExchangeResponse{
-			Status:        pb.ExchangeResponse_STATUS_TYPE_AUTHFAIL,
-			StatusMessage: "authHash missed"}, nil
+		return nil, status.Errorf(codes.Unauthenticated, "authHash missed")
 	}
-
-	// Create app
-	app := msgapp.NewMessagesApp(s.logger, s.db)
 
 	// Auth User
 	// @todo implement native auth
-	if err := app.Login(in.AuthHash); err != nil {
-		return &pb.ExchangeResponse{
-			Status:        pb.ExchangeResponse_STATUS_TYPE_AUTHFAIL,
-			StatusMessage: "AUTH failed"}, nil
+	if err := s.App.Login(in.AuthHash); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "Auth missed")
 	}
 
 	responce := &pb.ExchangeResponse{}
 
 	// Save icoming messages to DB
-	// @todo - how to handle error?
-	app.SaveMessages(in.Messages)
+	if err := s.App.SaveMessages(in.Messages); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "Error with saving messages")
+	}
 
 	// Get new messages
 	// @todo implement receiving messages from point of time
-	// @todo - how to handle error?
-	app.GetMessages(&responce.Messages)
+	if responce.Messages, err := s.App.GetMessages(); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "Error with getting new")
+	}
 
 	return responce, nil
 }
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	lis, err := net.Listen("tcp", ":9000")
 	if err != nil {
@@ -77,9 +70,14 @@ func main() {
 		log.Fatalf("failed start db: %v", err)
 	}
 
+	// Create app
+	app := messagesapp.MessagesApp{
+		Logger: sugarZap,
+		Db:     dbConn,
+	}
+
 	messengerServer := MessengerServer{
-		logger: sugarZap,
-		db:     dbConn,
+		App: &app,
 	}
 
 	grpcServer := grpc.NewServer()
