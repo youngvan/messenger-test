@@ -56,39 +56,31 @@ func (s *MessengerServer) Exchange(ctx context.Context, in *pb.ExchangeRequest) 
 	return responce, nil
 }
 
-func (s *MessengerServer) initLogger(logger *zap.SugaredLogger) error {
-	s.logger = logger
-	return nil
-}
-
-func (s *MessengerServer) initDb(db *pgxpool.Pool) error {
-	s.db = db
-	return nil
-}
-
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	lis, err := net.Listen("tcp", ":9000")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	messengerServer := MessengerServer{}
-
 	// Init logger
 	logger, _ := zap.NewProduction()
 	defer logger.Sync() // flushes buffer, if any
 	sugarZap := logger.Sugar()
 
-	messengerServer.initLogger(sugarZap)
-
 	// Init database
 	// todo move connection string to ENV
-	db, err := pgxpool.Connect(context.Background(), "postgres://messenger:00pass00@localhost:5432/messenger")
+	dbConn, err := pgxpool.Connect(context.Background(), "postgres://messenger:00pass00@localhost:5432/messenger")
 	if err != nil {
 		log.Fatalf("failed start db: %v", err)
 	}
-	messengerServer.initDb(db)
+
+	messengerServer := MessengerServer{
+		logger: sugarZap,
+		db:     dbConn,
+	}
 
 	grpcServer := grpc.NewServer()
 
