@@ -3,7 +3,6 @@ package messengerserver
 import (
 	"context"
 	"messenger/pkg/messagesapp"
-	"messenger/pkg/user"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -13,37 +12,32 @@ import (
 
 type MessengerServer struct {
 	pb.UnimplementedMessengerServiceServer
-	App         *messagesapp.MessagesApp
-	CurrentUser *user.UserStruct
+	App *messagesapp.MessagesApp
 }
 
 func (s *MessengerServer) Exchange(ctx context.Context, in *pb.ExchangeRequest) (*pb.ExchangeResponse, error) {
 
-	// Validate AuthHash present
-	if in.AuthHash == "" {
-		return nil, status.Errorf(codes.Unauthenticated, "authHash missed")
+	var requestMessages []*messagesapp.MessagesStruct
+	for _, msg := range in.Messages {
+		requestMessages = append(requestMessages, &messagesapp.MessagesStruct{
+			Subject:      msg.Subject,
+			Body:         msg.Body,
+			ReceiverHash: msg.ReceiverHash})
 	}
-
-	// Auth User
-	// @todo implement native auth
-	if err := s.CurrentUser.Login(ctx, in.AuthHash); err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "Auth missed")
-	}
-
-	responce := pb.ExchangeResponse{}
 
 	// Save icoming messages to DB
-	if err := s.App.SaveMessages(ctx, s.CurrentUser, in.Messages); err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "Error with saving messages")
+	if err := s.App.SaveMessages(ctx, requestMessages); err != nil {
+		return nil, status.Errorf(codes.Internal, "Error with saving messages")
 	}
 
 	// Get new messages
 	// @todo implement receiving messages from point of time
-	messages, err := s.App.GetMessages(ctx, s.CurrentUser)
+	messages, err := s.App.GetMessages(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "Error with getting new")
+		return nil, status.Errorf(codes.Internal, "Error with getting new messages")
 	}
 
+	var responce pb.ExchangeResponse
 	for _, msg := range messages {
 		responce.Messages = append(responce.Messages, &pb.Message{
 			Subject: msg.Subject,

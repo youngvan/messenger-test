@@ -6,14 +6,12 @@ import (
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
-
-	"messenger/pkg/user"
-	pb "messenger/proto/gen/proto/go/messagesproto/v1"
 )
 
 type MessagesStruct struct {
-	Subject string `json:"subject,omitempty"`
-	Body    string `json:"body,omitempty"`
+	Subject      string
+	Body         string
+	ReceiverHash string
 }
 
 type MessagesApp struct {
@@ -21,13 +19,14 @@ type MessagesApp struct {
 	Db     *pgxpool.Pool
 }
 
-func (app *MessagesApp) SaveMessages(ctx context.Context, user *user.UserStruct, messages []*pb.Message) error {
+const sqlInsertMessage = "INSERT INTO messages (id_from, id_to, subject, body) VALUES ($1, (SELECT id from users where hash=$2), $3, $4)"
+const sqlGetMessages = "SELECT subject FROM messages WHERE id_to = $1"
 
-	sqlStatement := "INSERT INTO messages (id_from, id_to, subject, body) VALUES ($1, (SELECT id from users where hash=$2), $3, $4)"
+func (app *MessagesApp) SaveMessages(ctx context.Context, messages []*MessagesStruct) error {
 
 	for _, message := range messages {
 
-		_, err := app.Db.Exec(ctx, sqlStatement, user.LoggedUser.ID, message.ReceiverHash, message.Subject, message.Body)
+		_, err := app.Db.Exec(ctx, sqlInsertMessage, ctx.Value("userID"), message.ReceiverHash, message.Subject, message.Body)
 		if err != nil {
 			app.Logger.Info("Can't save msg: ", err, message)
 		}
@@ -38,13 +37,11 @@ func (app *MessagesApp) SaveMessages(ctx context.Context, user *user.UserStruct,
 	return nil
 }
 
-func (app *MessagesApp) GetMessages(ctx context.Context, user *user.UserStruct) ([]MessagesStruct, error) {
+func (app *MessagesApp) GetMessages(ctx context.Context) ([]*MessagesStruct, error) {
 
-	result := []MessagesStruct{}
+	var result []*MessagesStruct
 
-	query := "select subject from messages where id_to = $1"
-
-	if err := pgxscan.Select(ctx, app.Db, &result, query, user.LoggedUser.ID); err != nil {
+	if err := pgxscan.Select(ctx, app.Db, &result, sqlGetMessages, ctx.Value("userID")); err != nil {
 		app.Logger.Info("Error with getting messages", err)
 		return nil, err
 	}
