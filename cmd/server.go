@@ -10,6 +10,9 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 
+	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpcauth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
+
 	"messenger/pkg/messagesapp"
 
 	"messenger/internal/messengerserver"
@@ -58,11 +61,13 @@ func main() {
 	// question: duplication of prefit and name?
 	// question: module folder, module file name (lowercase?), and module name corellation
 	messengerServer := messengerserver.MessengerServer{
-		App:         &app,
-		CurrentUser: &currentUser,
-	}
+		App: &app}
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
+			grpcauth.UnaryServerInterceptor(currentUser.CheckAuth),
+		)),
+	)
 
 	pb.RegisterMessengerServiceServer(grpcServer, &messengerServer)
 
